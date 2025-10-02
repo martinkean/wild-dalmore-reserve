@@ -33,7 +33,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         {currentPosition && (
           <button
             onClick={onCenterLocation}
-            className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-full transition-colors"
+            className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-full transition-colors flex items-center justify-center"
             title="My Location"
             style={{ minWidth: '44px', minHeight: '44px' }}
           >

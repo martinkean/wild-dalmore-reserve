@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useGeolocation } from './hooks/useGeolocation';
+import { GPSPosition } from './types';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { OfflineSyncStatus } from './components/OfflineSyncStatus';
 import { AuthForm } from './components/auth/AuthForm';
@@ -56,14 +57,11 @@ const AppContent: React.FC = () => {
   }, [user, loading, loadUserProfile]);
 
   const handleCenterLocation = () => {
-    // Center on current location - this will be passed to map
-    if (currentPosition && mapInstance) {
-      // The map component will handle this
-    }
+    // This function will be handled by the map component
   };
 
   const handleCenterReserve = () => {
-    // Center on reserve - this will be passed to map
+    // This function will be handled by the map component
   };
 
   const handleMapTabClick = () => {
@@ -122,7 +120,9 @@ const AppContent: React.FC = () => {
         return <AdminTab />;
       default:
         return (
-          <MapTab 
+          <MapTab
+            currentPosition={currentPosition}
+            accuracy={accuracy} 
             onCenterLocation={handleCenterLocation}
             onCenterReserve={handleCenterReserve}
           />
