@@ -1,6 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { LocationState, GPSPosition } from '../types';
 
+// Chrome-specific location request helper
+const requestLocationPermission = async (): Promise<boolean> => {
+  if (!navigator.permissions) return true; // Fallback for browsers without permissions API
+  
+  try {
+    const result = await navigator.permissions.query({ name: 'geolocation' });
+    return result.state !== 'denied';
+  } catch (error) {
+    console.warn('Permissions API not available:', error);
+    return true; // Fallback to attempting location access
+  }
+};
+
 interface UseGeolocationOptions {
   enableHighAccuracy?: boolean;
   timeout?: number;
@@ -65,6 +78,16 @@ export const useGeolocation = (options: UseGeolocationOptions = {}) => {
       setLocationState(prev => ({
         ...prev,
         error: 'Geolocation is not supported by this browser.',
+      }));
+      return null;
+    }
+
+    // Check permissions first (Chrome-friendly)
+    const hasPermission = await requestLocationPermission();
+    if (!hasPermission) {
+      setLocationState(prev => ({
+        ...prev,
+        error: 'Location access denied. Please enable location services and reload the page.',
       }));
       return null;
     }
