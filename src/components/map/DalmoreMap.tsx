@@ -124,6 +124,7 @@ export const DalmoreMap: React.FC<DalmoreMapProps> = ({
     // This will be handled by LayerControls to determine show all vs hide all
     setVisibleSpecies(new Set());
   };
+
   const getAccuracyColor = (acc: number) => {
     if (acc <= 5) return 'text-green-600';
     if (acc <= 10) return 'text-yellow-600';
@@ -181,16 +182,14 @@ export const DalmoreMap: React.FC<DalmoreMapProps> = ({
 
       {/* Coordinate Display */}
       {currentPosition && (
-        <div className="absolute bottom-24 left-4 bg-white bg-opacity-90 px-3 py-2 rounded-md text-xs font-mono z-10 shadow-md">
-          <div>Lat: {currentPosition.lat.toFixed(6)}</div>
-          <div>Lng: {currentPosition.lng.toFixed(6)}</div>
+        <div className="absolute bottom-20 left-4 bg-white bg-opacity-95 px-3 py-2 rounded-md text-sm font-mono z-10 shadow-lg border border-gray-200">
+          <div className="font-medium text-gray-800">Lat: {currentPosition.lat.toFixed(6)}</div>
+          <div className="font-medium text-gray-800">Lng: {currentPosition.lng.toFixed(6)}</div>
           {accuracy !== null && (
-            <div className="flex items-center gap-1 mt-1 pt-1 border-t border-gray-200">
-              <Satellite className="h-3 w-3 text-gray-600" />
-              <span className={`font-medium ${getAccuracyColor(accuracy)}`}>
-                {getAccuracyText(accuracy)}
-              </span>
-              <span className="text-gray-500">±{accuracy.toFixed(0)}m</span>
+            <div className={`flex items-center gap-1 mt-1 text-xs font-medium ${getAccuracyColor(accuracy)}`}>
+              <Satellite className="h-3 w-3" />
+              <span>{getAccuracyText(accuracy)}</span>
+              <span>±{accuracy.toFixed(0)}m</span>
             </div>
           )}
         </div>

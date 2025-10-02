@@ -56,13 +56,14 @@ const AppContent: React.FC = () => {
   }, [user, loading, loadUserProfile]);
 
   const handleCenterLocation = () => {
-    // This will be handled by the map component
-    console.log('Center on current location');
+    // Center on current location - this will be passed to map
+    if (currentPosition && mapInstance) {
+      // The map component will handle this
+    }
   };
 
   const handleCenterReserve = () => {
-    // This will be handled by the map component  
-    console.log('Center on Dalmore Reserve');
+    // Center on reserve - this will be passed to map
   };
 
   const handleMapTabClick = () => {
