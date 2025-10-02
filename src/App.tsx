@@ -105,6 +105,8 @@ const AppContent: React.FC = () => {
       case 'map':
         return (
           <MapTab 
+            currentPosition={currentPosition}
+            accuracy={accuracy}
             onCenterLocation={handleCenterLocation}
             onCenterReserve={handleCenterReserve}
           />

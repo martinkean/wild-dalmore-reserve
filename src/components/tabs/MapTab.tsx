@@ -1,20 +1,22 @@
 import React from 'react';
 import { DalmoreMap } from '../map/DalmoreMap';
-import { useGeolocation } from '../../hooks/useGeolocation';
 import { GPSPosition } from '../../types';
 
 interface MapTabProps {
+  currentPosition: GPSPosition | null;
+  accuracy: number | null;
   onLocationCapture?: (position: GPSPosition) => void;
   onCenterLocation?: () => void;
   onCenterReserve?: () => void;
 }
 
 export const MapTab: React.FC<MapTabProps> = ({ 
+  currentPosition,
+  accuracy,
   onLocationCapture, 
   onCenterLocation,
   onCenterReserve 
 }) => {
-  const { position, accuracy } = useGeolocation({ watch: true });
 
   const handleMapClick = (clickPosition: GPSPosition) => {
     onLocationCapture?.(clickPosition);
@@ -23,7 +25,7 @@ export const MapTab: React.FC<MapTabProps> = ({
   return (
     <div className="h-full">
       <DalmoreMap
-        currentPosition={position}
+        currentPosition={currentPosition}
         accuracy={accuracy}
         onCenterLocation={onCenterLocation}
         onCenterReserve={onCenterReserve}
