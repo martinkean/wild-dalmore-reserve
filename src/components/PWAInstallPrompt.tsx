@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TreePine, X } from 'lucide-react';
+import { TreePine } from 'lucide-react';
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -15,6 +15,7 @@ export const PWAInstallPrompt: React.FC = () => {
   const [showPrompt, setShowPrompt] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isFirefox, setIsFirefox] = useState(false);
 
   useEffect(() => {
     // Check if app is already installed
@@ -45,17 +46,24 @@ export const PWAInstallPrompt: React.FC = () => {
       setIsMobile(isMobileDevice);
     };
 
+    // Check if browser is Firefox
+    const checkIfFirefox = () => {
+      const isFirefoxBrowser = navigator.userAgent.toLowerCase().includes('firefox');
+      setIsFirefox(isFirefoxBrowser);
+    };
+
     checkIfInstalled();
     checkIfMobile();
+    checkIfFirefox();
 
     // Listen for the beforeinstallprompt event
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       
-      // Show prompt after a small delay if not installed and on mobile
+      // Show prompt after a small delay if not installed and on mobile or Firefox
       setTimeout(() => {
-        if (!isInstalled && isMobile) {
+        if (!isInstalled && (isMobile || isFirefox)) {
           setShowPrompt(true);
         }
       }, 2000);
@@ -71,12 +79,12 @@ export const PWAInstallPrompt: React.FC = () => {
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
 
-    // For iOS devices, show prompt manually since beforeinstallprompt doesn't fire
-    if (isMobile && !isInstalled) {
+    // For iOS and Firefox devices, show prompt manually since beforeinstallprompt doesn't fire
+    if ((isMobile || isFirefox) && !isInstalled) {
       const isIOS = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
       const isInStandaloneMode = (window.navigator as any).standalone;
       
-      if (isIOS && !isInStandaloneMode) {
+      if ((isIOS && !isInStandaloneMode) || isFirefox) {
         setTimeout(() => {
           setShowPrompt(true);
         }, 2000);
@@ -87,7 +95,7 @@ export const PWAInstallPrompt: React.FC = () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
-  }, [isInstalled, isMobile]);
+  }, [isInstalled, isMobile, isFirefox]);
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {
@@ -102,8 +110,14 @@ export const PWAInstallPrompt: React.FC = () => {
     } else {
       // For iOS and other browsers, show instructions
       const isIOS = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+      const isFirefoxMobile = isFirefox && isMobile;
+      
       if (isIOS) {
         alert('To install this app on your iOS device, tap the Share button in Safari and select "Add to Home Screen"');
+      } else if (isFirefoxMobile) {
+        alert('To install this app in Firefox:\n\n1. Tap the menu (⋮) in Firefox\n2. Look for "Install" or "Add to Home Screen"\n3. Follow the prompts to install');
+      } else if (isFirefox) {
+        alert('To install this app in Firefox:\n\n1. Click the menu (☰) in Firefox\n2. Look for "Install" option\n3. Or bookmark this page for easy access');
       } else {
         alert('To install this app, look for the "Add to Home Screen" option in your browser menu');
       }
@@ -117,8 +131,8 @@ export const PWAInstallPrompt: React.FC = () => {
     sessionStorage.setItem('pwa-prompt-dismissed', 'true');
   };
 
-  // Don't show if already installed, not mobile, or user dismissed this session
-  if (isInstalled || !isMobile || !showPrompt || sessionStorage.getItem('pwa-prompt-dismissed')) {
+  // Don't show if already installed, not mobile/Firefox, or user dismissed this session
+  if (isInstalled || (!isMobile && !isFirefox) || !showPrompt || sessionStorage.getItem('pwa-prompt-dismissed')) {
     return null;
   }
 
@@ -126,7 +140,6 @@ export const PWAInstallPrompt: React.FC = () => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
         <div className="text-center">
-          {/* TreePine Icon */}
           <div className="mx-auto w-16 h-16 bg-green-600 rounded-2xl flex items-center justify-center mb-4">
             <TreePine className="h-8 w-8 text-white" />
           </div>
