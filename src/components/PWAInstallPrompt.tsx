@@ -10,63 +10,109 @@ interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
 }
 
+interface BrowserInfo {
+  name: string;
+  isAndroid: boolean;
+  isIOS: boolean;
+  isMobile: boolean;
+  supportsInstallPrompt: boolean;
+}
+
 export const PWAInstallPrompt: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [isFirefox, setIsFirefox] = useState(false);
+  const [browserInfo, setBrowserInfo] = useState<BrowserInfo>({
+    name: 'unknown',
+    isAndroid: false,
+    isIOS: false,
+    isMobile: false,
+    supportsInstallPrompt: false
+  });
 
   useEffect(() => {
+    // Comprehensive browser detection
+    const detectBrowser = (): BrowserInfo => {
+      const userAgent = navigator.userAgent.toLowerCase();
+      const isAndroid = /android/.test(userAgent);
+      const isIOS = /iphone|ipad|ipod/.test(userAgent);
+      const isMobile = isAndroid || isIOS || /mobile/.test(userAgent);
+      
+      let browserName = 'unknown';
+      let supportsInstallPrompt = false;
+
+      if (userAgent.includes('samsungbrowser')) {
+        browserName = 'samsung';
+        supportsInstallPrompt = true; // Samsung Internet supports beforeinstallprompt
+      } else if (userAgent.includes('firefox')) {
+        browserName = 'firefox';
+        supportsInstallPrompt = false; // Firefox doesn't support beforeinstallprompt
+      } else if (userAgent.includes('edg/') || userAgent.includes('edgios') || userAgent.includes('edga')) {
+        browserName = 'edge';
+        supportsInstallPrompt = !isIOS; // Edge supports it on Android, not iOS
+      } else if (userAgent.includes('chrome') && !userAgent.includes('edg')) {
+        browserName = 'chrome';
+        supportsInstallPrompt = true; // Chrome supports beforeinstallprompt
+      } else if (userAgent.includes('safari') && isIOS) {
+        browserName = 'safari';
+        supportsInstallPrompt = false; // Safari uses different method
+      } else if (userAgent.includes('crios')) {
+        browserName = 'chrome-ios';
+        supportsInstallPrompt = false; // Chrome on iOS behaves like Safari
+      } else if (userAgent.includes('fxios')) {
+        browserName = 'firefox-ios';
+        supportsInstallPrompt = false; // Firefox on iOS behaves like Safari
+      }
+
+      return {
+        name: browserName,
+        isAndroid,
+        isIOS,
+        isMobile,
+        supportsInstallPrompt
+      };
+    };
+
     // Check if app is already installed
-    const checkIfInstalled = () => {
+    const checkIfInstalled = (): boolean => {
       // Check for standalone mode (installed PWA)
       if (window.matchMedia('(display-mode: standalone)').matches) {
-        setIsInstalled(true);
-        return;
+        return true;
       }
       
       // Check for iOS standalone mode
       if ((window.navigator as any).standalone === true) {
-        setIsInstalled(true);
-        return;
+        return true;
       }
 
       // Check if running in WebView or installed context
       if (document.referrer.includes('android-app://')) {
-        setIsInstalled(true);
-        return;
+        return true;
       }
+
+      return false;
     };
 
-    // Check if device is mobile
-    const checkIfMobile = () => {
-      const userAgent = navigator.userAgent.toLowerCase();
-      const isMobileDevice = /android|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(userAgent);
-      setIsMobile(isMobileDevice);
-    };
+    const browser = detectBrowser();
+    const installed = checkIfInstalled();
+    
+    setBrowserInfo(browser);
+    setIsInstalled(installed);
 
-    // Check if browser is Firefox
-    const checkIfFirefox = () => {
-      const isFirefoxBrowser = navigator.userAgent.toLowerCase().includes('firefox');
-      setIsFirefox(isFirefoxBrowser);
-    };
+    // Don't show prompt if already installed or not on mobile
+    if (installed || !browser.isMobile) {
+      return;
+    }
 
-    checkIfInstalled();
-    checkIfMobile();
-    checkIfFirefox();
-
-    // Listen for the beforeinstallprompt event
+    // Listen for the beforeinstallprompt event (Chrome, Samsung Internet, Edge Android)
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       
-      // Show prompt after a small delay if not installed and on mobile or Firefox
+      // Show prompt after delay for browsers that support native prompt
       setTimeout(() => {
-        if (!isInstalled && (isMobile || isFirefox)) {
-          setShowPrompt(true);
-        }
-      }, 2000);
+        setShowPrompt(true);
+      }, 3000);
     };
 
     // Listen for app installed event
@@ -76,53 +122,116 @@ export const PWAInstallPrompt: React.FC = () => {
       setDeferredPrompt(null);
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
-
-    // For iOS and Firefox devices, show prompt manually since beforeinstallprompt doesn't fire
-    if ((isMobile || isFirefox) && !isInstalled) {
-      const isIOS = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
-      const isInStandaloneMode = (window.navigator as any).standalone;
-      
-      if ((isIOS && !isInStandaloneMode) || isFirefox) {
-        setTimeout(() => {
+    if (browser.supportsInstallPrompt) {
+      window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.addEventListener('appinstalled', handleAppInstalled);
+    } else {
+      // For browsers without beforeinstallprompt (Safari iOS, Firefox, etc.)
+      // Show manual prompt after delay
+      setTimeout(() => {
+        if (!installed && !sessionStorage.getItem('pwa-prompt-dismissed')) {
           setShowPrompt(true);
-        }, 2000);
-      }
+        }
+      }, 3000);
     }
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
+      if (browser.supportsInstallPrompt) {
+        window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        window.removeEventListener('appinstalled', handleAppInstalled);
+      }
     };
-  }, [isInstalled, isMobile, isFirefox]);
+  }, []);
+
+  // Get browser-specific install instructions
+  const getInstallInstructions = (): string => {
+    const { name, isIOS, isAndroid } = browserInfo;
+
+    switch (name) {
+      case 'safari':
+        return 'Tap the Share button (↗️) at the bottom of your screen, then select "Add to Home Screen"';
+      
+      case 'chrome':
+        if (isAndroid) {
+          return 'Tap "Add to Home Screen" when prompted, or find "Install app" in the browser menu (⋮)';
+        }
+        return 'Tap "Add to Home Screen" when prompted';
+      
+      case 'chrome-ios':
+        return 'Tap the Share button at the bottom, then select "Add to Home Screen"';
+      
+      case 'samsung':
+        return 'Tap "Add page to" in the browser menu, then select "Home screen"';
+      
+      case 'firefox':
+        if (isAndroid) {
+          return 'Tap the menu (⋮) and select "Install" or "Add to Home Screen"';
+        }
+        return 'Look for "Install" in your browser menu';
+      
+      case 'firefox-ios':
+        return 'Tap the Share button, then select "Add to Home Screen"';
+      
+      case 'edge':
+        if (isAndroid) {
+          return 'Tap "Add to phone" when prompted, or find "Apps" in the browser menu (⋯)';
+        } else if (isIOS) {
+          return 'Tap the Share button, then select "Add to Home Screen"';
+        }
+        return 'Look for "Install app" in your browser menu';
+      
+      default:
+        if (isIOS) {
+          return 'Tap the Share button in your browser, then select "Add to Home Screen"';
+        } else if (isAndroid) {
+          return 'Look for "Add to Home Screen" or "Install" in your browser menu';
+        }
+        return 'Look for "Add to Home Screen" or "Install" option in your browser';
+    }
+  };
+
+  const getBrowserName = (): string => {
+    const { name, isIOS } = browserInfo;
+    
+    switch (name) {
+      case 'safari': return 'Safari';
+      case 'chrome': return 'Chrome';
+      case 'chrome-ios': return 'Chrome';
+      case 'samsung': return 'Samsung Internet';
+      case 'firefox': return 'Firefox';
+      case 'firefox-ios': return 'Firefox';
+      case 'edge': return 'Microsoft Edge';
+      default: return isIOS ? 'Safari' : 'your browser';
+    }
+  };
 
   const handleInstallClick = async () => {
-    if (deferredPrompt) {
-      // For Android and supported browsers
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      
-      if (outcome === 'accepted') {
-        setDeferredPrompt(null);
-        setShowPrompt(false);
+    if (deferredPrompt && browserInfo.supportsInstallPrompt) {
+      // Use native install prompt for supported browsers
+      try {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        
+        if (outcome === 'accepted') {
+          setDeferredPrompt(null);
+          setShowPrompt(false);
+        }
+      } catch (error) {
+        console.log('Install prompt failed:', error);
+        showManualInstructions();
       }
     } else {
-      // For iOS and other browsers, show instructions
-      const isIOS = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
-      const isFirefoxMobile = isFirefox && isMobile;
-      
-      if (isIOS) {
-        alert('To install this app on your iOS device, tap the Share button in Safari and select "Add to Home Screen"');
-      } else if (isFirefoxMobile) {
-        alert('To install this app in Firefox:\n\n1. Tap the menu (⋮) in Firefox\n2. Look for "Install" or "Add to Home Screen"\n3. Follow the prompts to install');
-      } else if (isFirefox) {
-        alert('To install this app in Firefox:\n\n1. Click the menu (☰) in Firefox\n2. Look for "Install" option\n3. Or bookmark this page for easy access');
-      } else {
-        alert('To install this app, look for the "Add to Home Screen" option in your browser menu');
-      }
-      setShowPrompt(false);
+      // Show manual instructions for other browsers
+      showManualInstructions();
     }
+  };
+
+  const showManualInstructions = () => {
+    const instructions = getInstallInstructions();
+    const browserName = getBrowserName();
+    
+    alert(`To install Dalmore Reserve on your device:\n\n${instructions}\n\nThis will add the app to your home screen for quick access, even when offline!`);
+    setShowPrompt(false);
   };
 
   const handleCancelClick = () => {
@@ -131,10 +240,13 @@ export const PWAInstallPrompt: React.FC = () => {
     sessionStorage.setItem('pwa-prompt-dismissed', 'true');
   };
 
-  // Don't show if already installed, not mobile/Firefox, or user dismissed this session
-  if (isInstalled || (!isMobile && !isFirefox) || !showPrompt || sessionStorage.getItem('pwa-prompt-dismissed')) {
+  // Don't show if already installed, not mobile, or user dismissed
+  if (isInstalled || !browserInfo.isMobile || !showPrompt || sessionStorage.getItem('pwa-prompt-dismissed')) {
     return null;
   }
+
+  const browserName = getBrowserName();
+  const hasNativePrompt = deferredPrompt && browserInfo.supportsInstallPrompt;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -148,10 +260,16 @@ export const PWAInstallPrompt: React.FC = () => {
             Install Dalmore Reserve
           </h2>
           
-          <p className="text-gray-600 text-sm mb-6 leading-relaxed">
+          <p className="text-gray-600 text-sm mb-4 leading-relaxed">
             Install this app on your home screen for quick and easy access when you're in the field. 
             Works offline and syncs when you're back online.
           </p>
+
+          {!hasNativePrompt && (
+            <p className="text-gray-500 text-xs mb-4 italic">
+              Instructions for {browserName}
+            </p>
+          )}
 
           <div className="space-y-3">
             <button
@@ -160,7 +278,7 @@ export const PWAInstallPrompt: React.FC = () => {
               style={{ minHeight: '48px' }}
             >
               <TreePine className="h-5 w-5" />
-              Add to Home Screen
+              {hasNativePrompt ? 'Install Now' : 'Show Instructions'}
             </button>
             
             <button
